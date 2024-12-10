@@ -171,7 +171,7 @@ def init_bi_biased_mask_faceformer(n_head, max_seq_len, period):
         alibi[i, :i+1] = bias[-(i+1):]
         if i+1 < max_seq_len:
             alibi[i, i+1:] = bias[-(max_seq_len-(i+1)):].flip(dims=[0])
-
+    
     alibi = slopes.unsqueeze(1).unsqueeze(1) * alibi.unsqueeze(0)
 
     return alibi

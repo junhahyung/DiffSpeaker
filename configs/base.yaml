@@ -41,12 +41,12 @@ LOSS:
   
 METRIC:
   None
-DATASET:
-  VOCASET:
-    NONE: none
+#DATASET:
+#  VOCASET:
+#    NONE: none
 
 DEMO:
-  EAMPLE: null
+  EXAMPLE: null
   ID: null
   CHECKPOINTS: "templates"
   TEMPLATE: "datasets/vocaset/templates.pkl"

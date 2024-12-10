@@ -45,8 +45,10 @@ def main():
     logger.info("Loading checkpoints from {}".format(cfg.DEMO.CHECKPOINTS))
     state_dict = torch.load(cfg.DEMO.CHECKPOINTS, map_location="cpu")["state_dict"]
 
-    state_dict.pop("denoiser.PPE.pe") # this is not needed, since the sequence length can be any flexiable
-    model.load_state_dict(state_dict, strict=False)
+    #import pdb; pdb.set_trace()
+    #state_dict.pop("denoiser.PPE.pe") # this is not needed, since the sequence length can be any flexiable
+    #model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -75,6 +77,8 @@ def main():
     else:
         id = torch.zeros([1, cfg.id_dim])
         id[0, 0] = 1
+    
+    print(id)
 
     # make prediction
     logger.info("Making predictions")
@@ -87,12 +91,50 @@ def main():
         prediction = model.predict(data_input)
         vertices = prediction['vertice_pred'].squeeze().cpu().numpy()
 
+    
+
+
+    from plyfile import PlyData, PlyElement
+    '''
+    print(vertices.shape)
+    print(vertices[0].shape)
+    
+    # Create structured array with named fields for vertex data
+    vertex_data = np.zeros(len(vertices[0])//3, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    vertex_data['x'] = vertices[0].reshape(-1, 3)[:, 0]
+    vertex_data['y'] = vertices[0].reshape(-1, 3)[:, 1]
+    vertex_data['z'] = vertices[0].reshape(-1, 3)[:, 2]
+    
+    el = PlyElement.describe(vertex_data, 'vertex')
+    PlyData([el]).write('vertices.ply')
+    import pdb; pdb.set_trace()
+    '''
+
+    '''
+    vertex_data_temp = np.zeros(len(template)//3, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    vertex_data_temp['x'] = template.reshape(-1, 3)[:, 0]
+    vertex_data_temp['y'] = template.reshape(-1, 3)[:, 1]
+    vertex_data_temp['z'] = template.reshape(-1, 3)[:, 2]
+    
+    el = PlyElement.describe(vertex_data_temp, 'vertex')
+    PlyData([el]).write('template_vertices.ply')
+    import pdb; pdb.set_trace()
+    '''
+
+
+
     # this function is copy from faceformer
     wav_path = cfg.DEMO.EXAMPLE
     test_name = os.path.basename(wav_path).split(".")[0]
     
     output_dir = os.path.join(cfg.FOLDER, str(cfg.model.model_type), str(cfg.NAME), "samples_" + cfg.TIME)
     file_name = os.path.join(output_dir,test_name + "_" + subject_id + '.mp4')
+
+    # for testing
+    #########################################################
+    #vertices = template.unsqueeze(0).repeat(vertices.shape[0],1).cpu().numpy()
+    #########################################################
+    
 
     animate(vertices, wav_path, file_name, cfg.DEMO.PLY, fps=25, use_tqdm=True, multi_process=True)
 

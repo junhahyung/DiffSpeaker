@@ -100,22 +100,10 @@ def parse_args(phase="train"):
             help="output dir",
         )
         group.add_argument(
-            "--template",
-            type=str,
-            required=False,
-            help="template path",
-        )
-        group.add_argument(
             "--checkpoint",
             type=str,
             required=True,
             help="output seperate or combined npy file",
-        )
-        group.add_argument(
-            "--id",
-            type=str,
-            required=True,
-            help="the candiate subect identity",
         )
         group.add_argument(
             "--ply",
@@ -180,8 +168,8 @@ def parse_args(phase="train"):
         cfg.DEMO.FRAME_RATE = params.frame_rate
         cfg.DEMO.EXAMPLE = params.example
         cfg.DEMO.CHECKPOINTS = params.checkpoint
-        cfg.DEMO.TEMPLATE = params.template
-        cfg.DEMO.ID = params.id
+        #cfg.DEMO.TEMPLATE = params.template
+        #cfg.DEMO.ID = params.id
         cfg.DEMO.PLY = params.ply
         cfg.TEST.FOLDER = params.out_dir if params.dir else cfg.TEST.FOLDER
 

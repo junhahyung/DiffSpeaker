@@ -4,9 +4,8 @@ import librosa
 import os
 import torch
 import cv2
-import pyrender
 import trimesh
-
+import pyrender
 import tempfile
 import imageio
 
@@ -18,8 +17,11 @@ except:
 
 import platform
 if platform.system() == "Linux":
-    # os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
+    #os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
     os.environ['PYOPENGL_PLATFORM'] = 'egl'
+
+    #os.environ['PYOPENGL_PLATFORM'] = 'glfw'  # Try this first
+    #os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
 
 
 def load_example_input(audio_path, processor = None):
@@ -132,86 +134,105 @@ def load_example_input(audio_path, processor = None):
 def render_mesh_helper(mesh, t_center, rot=np.zeros(3), tex_img=None, z_offset=0, template_type: str = "flame", rgb_per_v = None):
     
 
-    assert template_type in ["flame", "biwi"], "template_type should be one of ['flame', 'biwi'],but got {}".format(template_type)
+    assert template_type in ["flame", "biwi", "a2f"], "template_type should be one of ['flame', 'biwi', 'a2f'],but got {}".format(template_type)
 
 
     if template_type == "flame":
         camera_params = {'c': np.array([400, 400]),
                             'k': np.array([-0.19816071, 0.92822711, 0, 0, 0]),
                             'f': np.array([4754.97941935 / 2, 4754.97941935 / 2])}
-    elif template_type == "biwi":
+    elif template_type == "biwi" or template_type == "a2f":
         camera_params = {'c': np.array([400, 400]),
                          'k': np.array([-0.19816071, 0.92822711, 0, 0, 0]),
                          'f': np.array([4754.97941935 / 8, 4754.97941935 / 8])}
         
     frustum = {'near': 0.01, 'far': 3.0, 'height': 800, 'width': 800}
 
-    mesh_copy = Mesh(mesh.v, mesh.f)
-    mesh_copy.v[:] = cv2.Rodrigues(rot)[0].dot((mesh_copy.v-t_center).T).T+t_center
 
-    if rgb_per_v is None:
-        intensity = 2.0
-        primitive_material = pyrender.material.MetallicRoughnessMaterial(
-                    alphaMode='BLEND',
-                    baseColorFactor=[0.3, 0.3, 0.3, 1.0],
-                    metallicFactor=0.8, 
-                    roughnessFactor=0.8 
-                )
+    if template_type == "a2f":
+        r = pyrender.OffscreenRenderer(640, 480)
+        camera_dist = 2.0 
 
-        tri_mesh = trimesh.Trimesh(vertices=mesh_copy.v, faces=mesh_copy.f, vertex_colors=rgb_per_v)
-        render_mesh = pyrender.Mesh.from_trimesh(tri_mesh, material=primitive_material,smooth=True)
-    else:
-        intensity = 0.5
-        tri_mesh = trimesh.Trimesh(vertices=mesh_copy.v, faces=mesh_copy.f, vertex_colors=rgb_per_v)
-        render_mesh = pyrender.Mesh.from_trimesh(tri_mesh, smooth=True)
+        # cam = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
+        cam = pyrender.OrthographicCamera(xmag=1/1.5, ymag=1/1.5)  
 
-    # scene = pyrender.Scene(ambient_light=[.2, .2, .2], bg_color=[0, 0, 0])
-    scene = pyrender.Scene(ambient_light=[.2, .2, .2], bg_color=[255, 255, 255])
+        camera_pose = np.array([[1.0, 0, 0.0, 0.00],
+                                [0.0, 1.0, 0.0, 0.2],
+                                [0.0, 0.0, 1.0, camera_dist],
+                                [0.0, 0.0, 0.0, 1.0]])
+        light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=5.0)
 
-    camera = pyrender.IntrinsicsCamera(fx=camera_params['f'][0],
-                                      fy=camera_params['f'][1],
-                                      cx=camera_params['c'][0],
-                                      cy=camera_params['c'][1],
-                                      znear=frustum['near'],
-                                      zfar=frustum['far'])
+        py_mesh = pyrender.Mesh.from_trimesh(mesh)
+        scene = pyrender.Scene()
+        scene.add(py_mesh)
 
-    scene.add(render_mesh, pose=np.eye(4))
+        scene.add(cam, pose=camera_pose)
+        scene.add(light, pose=camera_pose)
+        color, _ = r.render(scene)
 
-    camera_pose = np.eye(4)
-    camera_pose[:3,3] = np.array([0, 0, 1.0-z_offset])
-    scene.add(camera, pose=[[1, 0, 0, 0],
-                            [0, 1, 0, 0],
-                            [0, 0, 1, 1],
-                            [0, 0, 0, 1]])
 
-    angle = np.pi / 6.0
-    pos = camera_pose[:3,3]
-    light_color = np.array([1., 1., 1.])
-    light = pyrender.DirectionalLight(color=light_color, intensity=intensity)
 
-    light_pose = np.eye(4)
-    light_pose[:3,3] = pos
-    scene.add(light, pose=light_pose.copy())
-    
-    light_pose[:3,3] = cv2.Rodrigues(np.array([angle, 0, 0]))[0].dot(pos)
-    scene.add(light, pose=light_pose.copy())
+    elif template_type == "biwi" or template_type == "flame": 
+        mesh_copy = Mesh(mesh.v, mesh.f)
+        mesh_copy.v[:] = cv2.Rodrigues(rot)[0].dot((mesh_copy.v-t_center).T).T+t_center
 
-    light_pose[:3,3] =  cv2.Rodrigues(np.array([-angle, 0, 0]))[0].dot(pos)
-    scene.add(light, pose=light_pose.copy())
+        if rgb_per_v is None:
+            intensity = 2.0
+            primitive_material = pyrender.material.MetallicRoughnessMaterial(
+                        alphaMode='BLEND',
+                        baseColorFactor=[0.3, 0.3, 0.3, 1.0],
+                        metallicFactor=0.8, 
+                        roughnessFactor=0.8 
+                    )
 
-    light_pose[:3,3] = cv2.Rodrigues(np.array([0, -angle, 0]))[0].dot(pos)
-    scene.add(light, pose=light_pose.copy())
+            tri_mesh = trimesh.Trimesh(vertices=mesh_copy.v, faces=mesh_copy.f, vertex_colors=rgb_per_v)
+            render_mesh = pyrender.Mesh.from_trimesh(tri_mesh, material=primitive_material,smooth=True)
+        else:
+            intensity = 0.5
+            tri_mesh = trimesh.Trimesh(vertices=mesh_copy.v, faces=mesh_copy.f, vertex_colors=rgb_per_v)
+            render_mesh = pyrender.Mesh.from_trimesh(tri_mesh, smooth=True)
 
-    light_pose[:3,3] = cv2.Rodrigues(np.array([0, angle, 0]))[0].dot(pos)
-    scene.add(light, pose=light_pose.copy())
+        # scene = pyrender.Scene(ambient_light=[.2, .2, .2], bg_color=[0, 0, 0])
+        scene = pyrender.Scene(ambient_light=[.2, .2, .2], bg_color=[255, 255, 255])
 
-    flags = pyrender.RenderFlags.SKIP_CULL_FACES
-    # try:
-    r = pyrender.OffscreenRenderer(viewport_width=frustum['width'], viewport_height=frustum['height'])
-    color, _ = r.render(scene, flags=flags)
-    # except:
-    #     print('pyrender: Failed rendering frame')
-    #     color = np.zeros((frustum['height'], frustum['width'], 3), dtype='uint8')
+
+        scene.add(render_mesh, pose=np.eye(4))
+
+        camera_pose = np.eye(4)
+        camera_pose[:3,3] = np.array([0, 0, 1.0-z_offset])
+        scene.add(camera, pose=[[1, 0, 0, 0],
+                                [0, 1, 0, 0],
+                                [0, 0, 1, 1],
+                                [0, 0, 0, 1]])
+
+        angle = np.pi / 6.0
+        pos = camera_pose[:3,3]
+        light_color = np.array([1., 1., 1.])
+        light = pyrender.DirectionalLight(color=light_color, intensity=intensity)
+
+        light_pose = np.eye(4)
+        light_pose[:3,3] = pos
+        scene.add(light, pose=light_pose.copy())
+        
+        light_pose[:3,3] = cv2.Rodrigues(np.array([angle, 0, 0]))[0].dot(pos)
+        scene.add(light, pose=light_pose.copy())
+
+        light_pose[:3,3] =  cv2.Rodrigues(np.array([-angle, 0, 0]))[0].dot(pos)
+        scene.add(light, pose=light_pose.copy())
+
+        light_pose[:3,3] = cv2.Rodrigues(np.array([0, -angle, 0]))[0].dot(pos)
+        scene.add(light, pose=light_pose.copy())
+
+        light_pose[:3,3] = cv2.Rodrigues(np.array([0, angle, 0]))[0].dot(pos)
+        scene.add(light, pose=light_pose.copy())
+
+        flags = pyrender.RenderFlags.SKIP_CULL_FACES
+        # try:
+        r = pyrender.OffscreenRenderer(viewport_width=frustum['width'], viewport_height=frustum['height'])
+        color, _ = r.render(scene, flags=flags)
+        # except:
+        #     print('pyrender: Failed rendering frame')
+        #     color = np.zeros((frustum['height'], frustum['width'], 3), dtype='uint8')
 
     return color[..., ::-1]
 
@@ -239,17 +260,26 @@ def animate(vertices: np.array, wav_path: str, file_name: str, ply: str, fps: in
     output_dir = os.path.dirname(file_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    template = Mesh(filename=ply)
     # determine biwi or flame
     if "FLAME" in ply:
+        template = Mesh(filename=ply)
         template_type = "flame"
     elif "BIWI" in ply:
+        template = Mesh(filename=ply)
         template_type = "biwi"
+    elif "A2F" in ply:
+        template_type = "a2f"
     else:
         raise ValueError("Template type not recognized, please use either BIWI or FLAME")
 
     # reshape vertices
-    predicted_vertices = vertices.reshape(-1, vertices.shape[1]//3, 3) if vertices.ndim < 3 else vertices
+    if template_type == "a2f":
+        assert vertices.shape[1] == 72035, "The number of vertices should be 72035"
+        assert vertices.ndim == 2, "The number of dimensions should be 2"
+        vertices = vertices[:, :72006]
+        predicted_vertices = vertices.reshape(-1, vertices.shape[1]//3, 3) if vertices.ndim < 3 else vertices
+    else:
+        predicted_vertices = vertices.reshape(-1, vertices.shape[1]//3, 3) if vertices.ndim < 3 else vertices
 
     num_frames = predicted_vertices.shape[0]
     if vertice_gt is not None:
@@ -260,7 +290,9 @@ def animate(vertices: np.array, wav_path: str, file_name: str, ply: str, fps: in
     center = np.mean(predicted_vertices[0], axis=0)
 
 
+    multi_process=False
     # make animation
+    '''
     if multi_process:
 
         from multiprocessing import Pool, cpu_count
@@ -297,28 +329,75 @@ def animate(vertices: np.array, wav_path: str, file_name: str, ply: str, fps: in
             for i in range(num_frames):
                 frames_final.append(np.concatenate([frames_gt[i], frames[i]], axis=1))
             frames = frames_final
+    '''
+    #else:
 
-    else:
-        frames = []
-        for i_frame in tqdm(range(num_frames)) if use_tqdm else range(num_frames):
+    '''
+    # for testing
+    #########################################################
+    import pickle
+    testing_frames = []
+    process_vertices = np.load('temp.npy')
+    process_vertices = process_vertices[:, :72006]
+    process_vertices = process_vertices.reshape(-1, process_vertices.shape[1]//3, 3)
+
+    if 'claire' in file_name:
+        subject = 'claire'
+    elif 'james' in file_name:
+        subject = 'james'
+    elif 'mark' in file_name:
+        subject = 'mark'
+
+    template_file = os.path.join('data/A2F', f'{subject}/templates.pkl')
+    with open(template_file, 'rb') as fin:
+        template = pickle.load(fin,encoding='latin1')[subject][:72006]
+    template = template.reshape(1, template.shape[0]//3, 3)
+
+    process_vertices = process_vertices + template
+    print(process_vertices.shape)
+
+    
+    for i_frame in tqdm(range(process_vertices.shape[0])):
+        render_mesh = trimesh.load_mesh(ply, process=False)
+        render_mesh.vertices = process_vertices[i_frame]
+        pred_img = render_mesh_helper(render_mesh, center, template_type=template_type)
+        pred_img = pred_img.astype(np.uint8)
+        testing_frames.append(pred_img)
+    
+    imageio.mimsave('testing_frames.mp4', testing_frames, fps = fps)
+    print('saved testing_frames.mp4')
+    #########################################################
+    '''
+    
+    frames = []
+    for i_frame in tqdm(range(num_frames)) if use_tqdm else range(num_frames):
+        if template_type == "a2f":
+            render_mesh = trimesh.load_mesh(ply, process=False)
+            render_mesh.vertices = predicted_vertices[i_frame]
+        else:
             render_mesh = Mesh(predicted_vertices[i_frame], template.f)
-            pred_img = render_mesh_helper(render_mesh, center, template_type=template_type)
-            pred_img = pred_img.astype(np.uint8)
-            frames.append(pred_img)
+        pred_img = render_mesh_helper(render_mesh, center, template_type=template_type)
+        pred_img = pred_img.astype(np.uint8)
+        frames.append(pred_img)
 
-        if vertice_gt is not None:
-            frames_gt = []
-            for i_frame in tqdm(range(num_frames)) if use_tqdm else range(num_frames):
+    if vertice_gt is not None:
+        frames_gt = []
+        for i_frame in tqdm(range(num_frames)) if use_tqdm else range(num_frames):
+            if template_type == "a2f":
+                render_mesh = trimesh.load_mesh(ply, process=False)
+            else:
                 render_mesh = Mesh(vertice_gt[i_frame], template.f)
-                pred_img = render_mesh_helper(render_mesh, center)
-                pred_img = pred_img.astype(np.uint8)
-                frames_gt.append(pred_img)
-        
-            # concat two videos
-            frames_final = []
-            for i in range(num_frames):
-                frames_final.append(np.concatenate([frames_gt[i], frames[i]], axis=1))
-            frames = frames_final
+            
+            pred_img = render_mesh_helper(render_mesh, center)
+            pred_img = pred_img.astype(np.uint8)
+            #cv2.imwrite(f'frame_{i_frame}.png', pred_img)
+            frames_gt.append(pred_img)
+    
+        # concat two videos
+        frames_final = []
+        for i in range(num_frames):
+            frames_final.append(np.concatenate([frames_gt[i], frames[i]], axis=1))
+        frames = frames_final
 
     imageio.mimsave(tmp_video_file.name, frames, fps = fps)
 

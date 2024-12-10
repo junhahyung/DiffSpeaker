@@ -1,0 +1,9 @@
+FOLDER: './experiments/a2f' # Experiment files saving path
+
+TEST:
+  FOLDER: './results' # Testing files saving path
+
+DATASET:
+  A2F:
+    ROOT: ./data/A2F
+

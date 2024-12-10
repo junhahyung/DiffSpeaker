@@ -68,4 +68,5 @@ def new_dir(cfg, phase, time_str, final_output_dir):
     # write config yaml
     config_file = '{}_{}_{}.yaml'.format('config', time_str, phase)
     final_config_file = final_output_dir / config_file
-    OmegaConf.save(config=cfg, f=final_config_file)
+    with open(final_config_file, 'w') as f:
+        OmegaConf.save(config=cfg, f=f)

@@ -18,5 +18,5 @@ python demo_biwi.py \
 #     --example demo/wavs/speech_obama.wav \
 #     --ply datasets/biwi/templates/BIWI.ply \
 #     --checkpoint checkpoints/biwi/diffspeaker_wav2vec2_biwi.ckpt \
-#     --id F3
+#     --id F4
 

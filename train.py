@@ -23,6 +23,7 @@ def main():
     logger = create_logger(cfg, phase="train")
 
     # resume
+
     if cfg.TRAIN.RESUME:
         resume = cfg.TRAIN.RESUME
         backcfg = cfg.TRAIN.copy()
@@ -86,6 +87,39 @@ def main():
     datasets = get_datasets(cfg, logger=logger)
     logger.info("datasets module {} initialized".format("".join(
         cfg.TRAIN.DATASETS)))
+
+    
+    # # temp
+    # temp_claire = []
+    # temp_james = []
+    # temp_mark = []
+    # for i in range(len(datasets[0].train_dataset)):
+    #     tmp = datasets[0].train_dataset[i]
+    #     tmp_fp = tmp['file_path']
+    #     if 'claire' in tmp_fp:
+    #         tmp_id = 'claire'
+    #     elif 'james' in tmp_fp:
+    #         tmp_id = 'james'
+    #     elif 'mark' in tmp_fp:
+    #         tmp_id = 'mark'
+    #     else:
+    #         raise ValueError('Unknown speaker')
+    #     tmp_vertice = tmp['vertice']
+    #     tmp_template = tmp['template']
+    #     tmp_diff = tmp_vertice - tmp_template.unsqueeze(0)
+
+    #     if tmp_id == 'claire':
+    #         temp_claire.append(tmp_diff)
+    #     elif tmp_id == 'james':
+    #         temp_james.append(tmp_diff)
+    #     elif tmp_id == 'mark':
+    #         temp_mark.append(tmp_diff)
+
+    # temp_claire = torch.cat(temp_claire, dim=0)
+    # temp_james = torch.cat(temp_james, dim=0)
+    # temp_mark = torch.cat(temp_mark, dim=0)
+    # temp_all = torch.cat([temp_claire, temp_james, temp_mark], dim=0)
+    # import pdb; pdb.set_trace()
 
     # tmp = next(iter(datasets[0].train_dataset)) #TODO: remove this line
     # tmp = next(iter(datasets[0].train_dataloader()))

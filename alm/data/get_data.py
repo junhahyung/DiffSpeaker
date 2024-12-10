@@ -13,6 +13,7 @@ def collate_tensors(batch):
         sub_tensor.add_(b)
     return canvas
 
+'''
 def vocaset_collate_fn(batch):
     notnone_batches = [b for b in batch if b is not None]
     # notnone_batches.sort(key=lambda x: x['vertice_length'], reverse=True)
@@ -89,12 +90,42 @@ def voxcelebinstacoeflmdb_collate_fn(batch):
     if 'flame_t' in notnone_batches[0]:
         adpated_batch['T'] = collate_tensors([b['flame_t'].float() for b in notnone_batches])
     return adpated_batch
+'''
+def a2f_collate_fn(batch):
+    notnone_batches = [b for b in batch if b is not None]
+    # notnone_batches.sort(key=lambda x: x['vertice_length'], reverse=True)
+    adapted_batch = {
+        'audio': collate_tensors([b['audio'].float() for b in notnone_batches]),
+        'audio_attention': collate_tensors([b['audio_attention'] for b in notnone_batches]),
+        'vertice': collate_tensors([b['vertice'].float() for b in notnone_batches]),
+        'vertice_attention': collate_tensors([b['vertice_attention'] for b in notnone_batches]),
+        'template': collate_tensors([b['template'].float() for b in notnone_batches]),
+        'id': collate_tensors([b['id'].float() for b in notnone_batches]),
+        'file_name': [b['file_name'] for b in notnone_batches],
+        'file_path': [b['file_path'] for b in notnone_batches],
+    }
+    return adapted_batch
 
 
 def get_datasets(cfg, logger, phase='train'):
     dataset_names = eval(f"cfg.{phase.upper()}.DATASETS")
     datasets = []
     for dataset_name in dataset_names:
+        if dataset_name.lower() in ['a2f']:
+            from .a2f import A2FDataModule
+            data_root = eval(f"cfg.DATASET.{dataset_name.upper()}.ROOT")
+            collate_fn = a2f_collate_fn
+            dataset = A2FDataModule(
+                cfg = cfg,
+                data_root = data_root,
+                batch_size=cfg.TRAIN.BATCH_SIZE,
+                num_workers=cfg.TRAIN.NUM_WORKERS,
+                debug=cfg.DEBUG,
+                collate_fn=collate_fn,
+            )
+            datasets.append(dataset)
+
+        '''
         if dataset_name.lower() in ['vocaset']:
             from .vocaset import VOCASETDataModule
             data_root = eval(f"cfg.DATASET.{dataset_name.upper()}.ROOT")
@@ -166,6 +197,7 @@ def get_datasets(cfg, logger, phase='train'):
                 collate_fn=collate_fn,
             )
             datasets.append(dataset)
+        '''
 
     cfg.DATASET.NFEATS = datasets[0].nfeats
     return datasets

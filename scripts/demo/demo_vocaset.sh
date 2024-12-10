@@ -15,7 +15,7 @@ python demo_vocaset.py \
     --cfg configs/diffusion/vocaset/diffspeaker_wav2vec2_vocaset.yaml \
     --cfg_assets configs/assets/vocaset.yaml \
     --template datasets/vocaset/templates.pkl \
-    --example demo/wavs/speech_long.wav \
+    --example demo/wavs/speech_obama.wav \
     --ply datasets/vocaset/templates/FLAME_sample.ply \
     --checkpoint checkpoints/vocaset/diffspeaker_wav2vec2_vocaset.ckpt \
     --id FaceTalk_170809_00138_TA

@@ -1,0 +1,7 @@
+experiments
+*.ply
+data
+__pycache__
+checkpoints
+results
+mesh

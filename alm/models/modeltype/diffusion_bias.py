@@ -6,7 +6,7 @@ from transformers import Wav2Vec2Model
 
 from alm.config import instantiate_from_config
 from alm.models.modeltype.base import BaseModel
-from alm.models.losses.voca import VOCALosses
+from alm.models.losses.voca import VOCALosses, MaskedConsistency, MaskedVelocityConsistency
 from alm.utils.demo_utils import animate
 from .base import BaseModel
 
@@ -39,6 +39,9 @@ class DIFFUSION_BIAS(BaseModel):
                 split: VOCALosses(cfg=cfg, split=split)
                 for split in ["losses_train", "losses_test", "losses_val",] # "losses_train_val"
             })
+
+        self.recon_loss = MaskedConsistency()
+        self.vel_loss = MaskedVelocityConsistency()
 
         self.losses = {
             key: self._losses["losses_" + key]
@@ -114,7 +117,13 @@ class DIFFUSION_BIAS(BaseModel):
                 batch['audio'][audio_mask] = 0
 
             rs_set = self._diffusion_forward(batch, batch_idx, phase="train")
-            loss = self.losses[split].update(rs_set)
+            #loss = self.losses[split].update(rs_set)
+            mask = rs_set['vertice_attention'].unsqueeze(-1)
+            loss1 = self.recon_loss(rs_set['vertice'], rs_set['vertice_pred'], mask)
+            loss2 = self.vel_loss(rs_set['vertice'], rs_set['vertice_pred'], mask)
+            loss = loss1 + loss2
+            self.losses[split].update(loss1, loss2, loss)
+
             return loss
 
 
@@ -133,7 +142,12 @@ class DIFFUSION_BIAS(BaseModel):
                 with torch.no_grad():
                     # same as the training, we use the autoregressive inference
                     rs_set = self._diffusion_forward(batch, batch_idx, phase="val")
-                    loss = self.losses[split].update(rs_set)
+                    #loss = self.losses[split].update(rs_set)
+                    mask = rs_set['vertice_attention'].unsqueeze(-1)
+                    loss1 = self.recon_loss(rs_set['vertice'], rs_set['vertice_pred'], mask)
+                    loss2 = self.vel_loss(rs_set['vertice'], rs_set['vertice_pred'], mask)
+                    loss = loss1 + loss2
+                    self.losses[split].update(loss1, loss2, loss)
 
                     if loss is None:
                         return ValueError("loss is None")
@@ -641,6 +655,7 @@ class DIFFUSION_BIAS(BaseModel):
             vertice_attention = torch.cat([vertice_attention, ] * 2, dim = 0) # vertice_attention.shape = [batch_size * 2, vert_len]
             object_emb = torch.cat([object_emb, ] * 2, dim = 0) # object_emb.shape = [batch_size * 2, 1, latent_dim]
 
+        temp = []
         # perform denoising
         for i, t in enumerate(timesteps):
             if silent_hidden_state is not None: # self.do_classifier_free_guidence is True
@@ -669,8 +684,15 @@ class DIFFUSION_BIAS(BaseModel):
                 vertices, _ = vertices.chunk(2, dim = 0)
 
             vertices = self.scheduler.step(vertices_pred, t, vertices, **extra_step_kwargs).prev_sample
+
+            print(t, vertices.shape)
+            #temp.append(vertices[0,0].cpu().numpy())
+        
+        #print(np.stack(temp).shape)
+        #np.save('temp.npy', np.stack(temp))
                 
-        return vertices
+        #return vertices
+        return vertices_pred
 
     def _visualize(self, batch, rs_set, parrallel = True):
         """
